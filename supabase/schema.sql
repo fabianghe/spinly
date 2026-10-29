@@ -476,6 +476,76 @@ $$;
 
 create index if not exists profiles_last_seen_idx on public.profiles (last_seen_at desc);
 
+-- ---------- Secret admin code (no account needed) ----------------------
+-- Set it once in the SQL Editor (min 12 chars; never stored in plain text):
+--   select public.set_admin_code('your-long-secret-phrase');
+-- Then open /admin on the site and type it. Setting a new code signs out
+-- every device that got in with the old one.
+
+create table if not exists public.app_secrets (
+  key        text primary key,
+  salt       text not null,
+  hash       text not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_secrets enable row level security; -- no policies: unreadable via the API
+
+create table if not exists public.admin_code_attempts (
+  who          text not null,
+  attempted_at timestamptz not null default now()
+);
+create index if not exists admin_code_attempts_idx on public.admin_code_attempts (who, attempted_at desc);
+alter table public.admin_code_attempts enable row level security;
+
+create or replace function public.set_admin_code(p_code text)
+returns text
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_salt text := md5(random()::text || clock_timestamp()::text || random()::text);
+begin
+  if length(coalesce(p_code, '')) < 12 then raise exception 'Use at least 12 characters'; end if;
+  insert into public.app_secrets (key, salt, hash, updated_at)
+  values ('admin_code', v_salt, encode(sha256(convert_to(v_salt || p_code, 'UTF8')), 'hex'), now())
+  on conflict (key) do update set salt = excluded.salt, hash = excluded.hash, updated_at = now();
+  -- Revoke admin from every guest session that used an older code.
+  update public.profiles set role = 'user' where role = 'admin' and email is null;
+  return 'Admin code set. Open /admin and enter it.';
+end;
+$$;
+
+-- Returns true if the code was right (and makes this session an admin).
+-- 5 wrong tries per hour per IP (or per session if the IP is unknown).
+create or replace function public.claim_admin(p_code text)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+declare
+  me    uuid := auth.uid();
+  v_who text := coalesce(public._client_ip_hash(), auth.uid()::text);
+  sec   public.app_secrets;
+  fails integer;
+begin
+  if me is null then raise exception 'not_authenticated'; end if;
+  select count(*) into fails from public.admin_code_attempts a
+   where a.who = v_who and a.attempted_at > now() - interval '1 hour';
+  if fails >= 5 then raise exception 'too_many_attempts'; end if;
+
+  select * into sec from public.app_secrets where key = 'admin_code';
+  if not found then raise exception 'admin_code_not_set'; end if;
+
+  if encode(sha256(convert_to(sec.salt || coalesce(p_code, ''), 'UTF8')), 'hex') <> sec.hash then
+    insert into public.admin_code_attempts (who) values (v_who);
+    return false;
+  end if;
+
+  perform public.ensure_profile();
+  update public.profiles set role = 'admin', banned = false, ban_reason = null where id = me;
+  delete from public.admin_code_attempts a where a.who = v_who;
+  return true;
+end;
+$$;
+
 -- ---------- Permissions -----------------------------------------------
 
 revoke all on function public.find_match(text), public.queue_poll(), public.leave_queue(),
@@ -495,6 +565,9 @@ grant execute on function public.find_match(text), public.queue_poll(), public.l
 
 grant execute on function public.online_count() to anon, authenticated;
 grant execute on function public.ensure_profile() to authenticated;
+revoke all on function public.set_admin_code(text) from public, anon, authenticated; -- SQL Editor only
+revoke all on function public.claim_admin(text) from public, anon;
+grant execute on function public.claim_admin(text) to authenticated;
 
 -- Newer Supabase projects may not auto-grant API access to new tables.
 -- Grant read access explicitly; Row Level Security still decides which rows.
@@ -514,5 +587,9 @@ begin
 end $$;
 
 -- ---------- Make yourself admin ----------------------------------------
--- After you sign in once with Google, run (with your email):
+-- Easiest: select public.set_admin_code('your-long-secret-phrase');  then use it at /admin.
+-- Or, for an email/Google account that has signed in once:
 --   update public.profiles set role = 'admin' where email = 'you@example.com';
+
+-- Tell the API layer to pick up the new tables/functions right away.
+notify pgrst, 'reload schema';

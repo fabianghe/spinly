@@ -109,6 +109,40 @@ export function useAuth() {
     return null;
   };
 
+  /** Secret admin code: becomes admin in this browser, no account needed. */
+  const claimAdmin = async (code: string): Promise<string | null> => {
+    const supabase = getSupabase();
+    guestFlow.current = true;
+    try {
+      let current = session;
+      if (!current) {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error || !data.session) {
+          return /anonymous/i.test(error?.message ?? "")
+            ? "Enable “Allow anonymous sign-ins” in Supabase → Authentication first."
+            : (error?.message ?? "Couldn't start a session.");
+        }
+        current = data.session;
+      }
+      const { data: ok, error } = await supabase.rpc("claim_admin", { p_code: code });
+      if (error) {
+        if (/too_many_attempts/.test(error.message)) return "Too many wrong tries. Wait an hour and try again.";
+        if (/admin_code_not_set/.test(error.message)) return "No admin code set yet. Run set_admin_code in the Supabase SQL Editor.";
+        if (/claim_admin|schema cache/.test(error.message)) return "Database is missing the latest schema. Re-run supabase/schema.sql.";
+        return error.message;
+      }
+      if (ok !== true) return "Wrong code.";
+      const { profile: p, error: pErr } = await fetchProfile(supabase, current.user.id);
+      setSession(current);
+      setProfile(p);
+      setDbError(pErr);
+      setStatus(pErr ? "db-error" : "signed-in");
+      return null;
+    } finally {
+      guestFlow.current = false;
+    }
+  };
+
   /** Email + password, used for the admin account (created in the Supabase dashboard). */
   const signInWithPassword = async (email: string, password: string): Promise<string | null> => {
     const { error } = await getSupabase().auth.signInWithPassword({ email, password });
@@ -130,5 +164,5 @@ export function useAuth() {
     window.location.reload();
   };
 
-  return { status, session, profile, dbError, reset, signInWithGoogle, signInAsGuest, signInWithPassword, signOut, confirmAge };
+  return { status, session, profile, dbError, reset, claimAdmin, signInWithGoogle, signInAsGuest, signInWithPassword, signOut, confirmAge };
 }

@@ -21,11 +21,14 @@ By default people just press **Start**; there's no sign-up and no Google setup.
    - `NEXT_PUBLIC_SITE_URL` (your live URL, e.g. `https://spinly.vercel.app`)
 
    Then **Deployments → ⋯ → Redeploy**. The `NEXT_PUBLIC_` values are baked in at build time, so a redeploy is required.
-3. **Admin account:** Supabase → **Authentication → Users → Add user → Create new user**: your admin email, a strong password, tick *Auto Confirm*. Then in the **SQL Editor**:
+3. **Admin access (no account needed):** in the Supabase **SQL Editor**, choose a long secret phrase and run:
    ```sql
-   update public.profiles set role = 'admin' where email = 'your-admin@gmail.com';
+   select public.set_admin_code('your-long-secret-phrase');
    ```
-   Log in at `/admin` with that email and password.
+   Open `/admin` on your site and enter it. That browser stays admin; repeat on any other device.
+   - The code is stored only as a salted hash in your database, never in the repo.
+   - After 5 wrong tries, that IP is locked out for an hour.
+   - Running `set_admin_code` again with a new phrase signs out every device that used the old one.
 
 That's it. Add the Cloudflare TURN relay (see below) soon after: without it, roughly 1 in 6 users on strict mobile or office networks can't connect.
 
@@ -58,7 +61,7 @@ Cloudflare dashboard → **Realtime → TURN Server → Create**. Add the *Turn 
 3. Deploy. Add your domain under **Settings → Domains**, then update `NEXT_PUBLIC_SITE_URL` and the Supabase URLs above to match.
 
 ## Admin access
-Either create a password user (quick start step 3), or sign in once with Google using the Gmail you want as admin, then in Supabase **SQL Editor**:
+Use the secret admin code (quick start step 3). Alternatively, create an email/password user in Supabase (**Authentication → Users → Add user**, *Auto Confirm*), or sign in once with Google, then in the **SQL Editor**:
 
 ```sql
 update public.profiles set role = 'admin' where email = 'your-admin@gmail.com';

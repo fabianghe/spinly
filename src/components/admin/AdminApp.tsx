@@ -63,24 +63,19 @@ interface ReportRow {
 const LIVE_REFRESH_MS = 5000;
 
 export function AdminApp() {
-  const { status, session, profile, signInWithGoogle, signInWithPassword, signOut } = useAuth();
+  const { status, profile, dbError, claimAdmin, signInWithGoogle, signInWithPassword } = useAuth();
   const [tab, setTab] = useState<Tab>("live");
 
   if (status === "loading") return <Shell>Loading…</Shell>;
   if (status === "unconfigured") return <Shell>Supabase isn&apos;t configured yet.</Shell>;
-  const isGuest = Boolean(session?.user.is_anonymous);
-  if (status === "signed-out" || isGuest)
-    return <AdminLogin onPassword={signInWithPassword} onGoogle={googleEnabled ? () => signInWithGoogle("/admin") : undefined} />;
+  if (status === "db-error") return <Shell>Database error: {dbError}. Re-run supabase/schema.sql in Supabase.</Shell>;
   if (profile?.role !== "admin")
     return (
-      <Shell>
-        <div>
-          <p>This account isn&apos;t an admin.</p>
-          <button onClick={signOut} className="mt-4 rounded-full bg-dusk px-4 py-2 text-mist">
-            Sign out
-          </button>
-        </div>
-      </Shell>
+      <AdminLogin
+        onCode={claimAdmin}
+        onPassword={signInWithPassword}
+        onGoogle={googleEnabled ? () => signInWithGoogle("/admin") : undefined}
+      />
     );
 
   return (
@@ -419,58 +414,63 @@ function Table({ head, children }: { head: string[]; children: React.ReactNode }
 }
 
 function AdminLogin({
+  onCode,
   onPassword,
   onGoogle,
 }: {
+  onCode: (code: string) => Promise<string | null>;
   onPassword: (email: string, password: string) => Promise<string | null>;
   onGoogle?: () => void;
 }) {
+  const [code, setCode] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [useEmail, setUseEmail] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(useEmail ? await onPassword(email, password) : await onCode(code));
+    setBusy(false);
+  };
+
   return (
     <div className="grid min-h-dvh place-items-center p-6">
-      <form
-        className="w-full max-w-xs"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          setError(await onPassword(email, password));
-          setBusy(false);
-        }}
-      >
+      <form className="w-full max-w-xs" onSubmit={submit}>
         <h1 className="font-display text-3xl font-bold">Admin</h1>
-        <input
-          type="email"
-          autoComplete="username"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          aria-label="Email"
-          className="mt-6 w-full rounded-xl bg-dusk px-4 py-3 placeholder:text-haze/70"
-        />
-        <input
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          aria-label="Password"
-          className="mt-2 w-full rounded-xl bg-dusk px-4 py-3 placeholder:text-haze/70"
-        />
+        {useEmail ? (
+          <>
+            <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" aria-label="Email" className="mt-6 w-full rounded-xl bg-dusk px-4 py-3 placeholder:text-haze/70" />
+            <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" aria-label="Password" className="mt-2 w-full rounded-xl bg-dusk px-4 py-3 placeholder:text-haze/70" />
+          </>
+        ) : (
+          <input
+            type="password"
+            autoComplete="current-password"
+            required
+            minLength={12}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="Admin code"
+            aria-label="Admin code"
+            className="mt-6 w-full rounded-xl bg-dusk px-4 py-3 placeholder:text-haze/70"
+          />
+        )}
         {error && (
           <p role="alert" className="mt-3 text-sm text-coral">
             {error}
           </p>
         )}
         <button disabled={busy} className="mt-4 w-full rounded-xl bg-mist py-3 font-semibold text-plum-deep disabled:opacity-60">
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? "Checking…" : "Enter"}
+        </button>
+        <button type="button" onClick={() => { setUseEmail((v) => !v); setError(null); }} className="mt-4 w-full text-sm text-haze underline">
+          {useEmail ? "Use admin code instead" : "Use email and password instead"}
         </button>
         {onGoogle && (
-          <button type="button" onClick={onGoogle} className="mt-3 w-full text-sm text-haze underline">
+          <button type="button" onClick={onGoogle} className="mt-2 w-full text-sm text-haze underline">
             Sign in with Google
           </button>
         )}
