@@ -82,7 +82,7 @@ Drop images into `public/hero/` and they appear automatically on the next deploy
 - `1-….webp` … `6-….webp`: the stranger reel, in file-name order. Each photo is paired with the country and chat line at the same position in `src/components/marketing/StrangerShuffle.tsx`.
 - The included photos are AI-generated (the people don't exist), CC0 / public domain, from [faker-js/assets-person-portrait](https://github.com/faker-js/assets-person-portrait).
 - `you.webp`: the small "You" window (optional).
-- Portrait 4:5, about 800×1000, under 200 KB each (webp or jpg).
+- Portrait 4:5 WebP: 400×500 for the reel, 240×300 for `you`, quality ~60 (each 10–40 KB). They're served as-is (no Vercel Image Optimization), so optimize before adding: e.g. `cwebp -q 60 -resize 400 500 in.jpg -o 1-name.webp`.
 
 Use **AI-generated people** (no real person, so no consent issue) or stock photos that come with a **model release** (Adobe Stock, Shutterstock, Generated Photos commercial license). Free photo sites like Unsplash and Pexels don't include model releases, which is risky when the photo implies someone uses a stranger-chat app. Everyone shown should clearly be an adult (25+), fully clothed, and not resemble a celebrity.
 

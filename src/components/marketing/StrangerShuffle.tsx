@@ -26,6 +26,18 @@ export function StrangerShuffle({ strangers: photos = [], you = null }: { strang
     const t = setInterval(() => setI((x) => (x + 1) % REEL.length), 2200);
     return () => clearInterval(t);
   }, []);
+  // Warm the browser cache for the rest of the reel once the page is idle (~120 KB total).
+  useEffect(() => {
+    if (photos.length < 2) return;
+    const t = setTimeout(() => {
+      photos.slice(1).forEach((src) => {
+        const img = document.createElement("img");
+        img.src = src;
+      });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [photos]);
+
   const s = REEL[i];
 
   return (
@@ -44,7 +56,9 @@ export function StrangerShuffle({ strangers: photos = [], you = null }: { strang
               src={photos[i % photos.length]}
               alt=""
               fill
-              sizes="(min-width: 768px) 420px, 90vw"
+              // Pre-optimized 400×500 WebP (~10–40 KB): serve as-is from the CDN,
+              // no Vercel Image Optimization (which counts against your quota).
+              unoptimized
               priority={i === 0}
               className="object-cover"
             />
@@ -69,7 +83,7 @@ export function StrangerShuffle({ strangers: photos = [], you = null }: { strang
       {/* You */}
       <div className="absolute -bottom-6 -right-4 aspect-[3/4] w-[34%] overflow-hidden rounded-2xl border-4 border-plum bg-dusk-2 shadow-2xl md:-right-8">
         {you ? (
-          <Image src={you} alt="" fill sizes="160px" className="object-cover" />
+          <Image src={you} alt="" fill unoptimized className="object-cover" />
         ) : (
           <>
             <div className="absolute bottom-0 left-1/2 h-[40%] w-[80%] -translate-x-1/2 rounded-t-[50%] bg-coral/60" />
