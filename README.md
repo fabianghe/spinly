@@ -77,6 +77,14 @@ Turn on 2-step verification for that Google account.
 
 ---
 
+## Hero photos (landing page)
+Drop images into `public/hero/` and they appear automatically on the next deploy (silhouettes are used until then):
+- `1-….webp` … `6-….webp`: the stranger reel, in this order: Brazil (São Paulo), Japan, India, Italy, Romania, USA. Each photo is paired with the country and chat line at the same position in `src/components/marketing/StrangerShuffle.tsx`.
+- `you.webp`: the small "You" window (optional).
+- Portrait 4:5, about 800×1000, under 200 KB each (webp or jpg).
+
+Use **AI-generated people** (no real person, so no consent issue) or stock photos that come with a **model release** (Adobe Stock, Shutterstock, Generated Photos commercial license). Free photo sites like Unsplash and Pexels don't include model releases, which is risky when the photo implies someone uses a stranger-chat app. Everyone shown should clearly be an adult (25+), fully clothed, and not resemble a celebrity.
+
 ## Run locally
 
 ```bash

@@ -1,18 +1,11 @@
 import Link from "next/link";
-import { guestsAllowed, siteConfig, absoluteUrl } from "@/config/site";
+import { siteConfig, absoluteUrl } from "@/config/site";
 import { homeFaq } from "@/content/faq";
 import { landingPages } from "@/content/landing-pages";
 import { JsonLd, faqJsonLd } from "@/components/marketing/JsonLd";
 import { OnlineNow } from "@/components/marketing/OnlineNow";
 import { StrangerShuffle } from "@/components/marketing/StrangerShuffle";
-
-const steps = [
-  guestsAllowed
-    ? { title: "Confirm you're 18+", body: "No account, no email. Strangers only see your country." }
-    : { title: "Sign in with Google", body: "One tap. Strangers only see your first name and country." },
-  { title: "Allow your camera", body: "Your browser asks once. Nothing to download or install." },
-  { title: "Press Start", body: "You're face to face with someone new in seconds. Press Next (or Esc) to skip." },
-];
+import { getHeroPhotos } from "@/lib/heroPhotos";
 
 const safety = [
   { title: `${siteConfig.minAge}+ only`, body: "Everyone confirms their age before their first chat." },
@@ -66,25 +59,7 @@ export default function HomePage() {
           </div>
           <p className="mt-5 text-sm text-haze">Free, no download, works on phone and desktop.</p>
         </div>
-        <StrangerShuffle />
-      </section>
-
-      {/* How it works — a real sequence, so numbered */}
-      <section className="mx-auto w-full max-w-6xl px-5 py-16 md:px-8" aria-labelledby="how">
-        <h2 id="how" className="font-display text-4xl font-bold tracking-tight">
-          How it works
-        </h2>
-        <ol className="mt-10 grid gap-10 md:grid-cols-3">
-          {steps.map((s, i) => (
-            <li key={s.title} className="flex gap-5">
-              <span className="font-display text-5xl font-extrabold leading-none text-coral">{i + 1}</span>
-              <div>
-                <h3 className="text-lg font-semibold">{s.title}</h3>
-                <p className="mt-1 text-haze">{s.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <StrangerShuffle {...getHeroPhotos()} />
       </section>
 
       {/* Safety */}
