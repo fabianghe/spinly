@@ -79,7 +79,8 @@ Turn on 2-step verification for that Google account.
 
 ## Hero photos (landing page)
 Drop images into `public/hero/` and they appear automatically on the next deploy (silhouettes are used until then):
-- `1-….webp` … `6-….webp`: the stranger reel, in this order: Brazil (São Paulo), Japan, India, Italy, Romania, USA. Each photo is paired with the country and chat line at the same position in `src/components/marketing/StrangerShuffle.tsx`.
+- `1-….webp` … `6-….webp`: the stranger reel, in file-name order. Each photo is paired with the country and chat line at the same position in `src/components/marketing/StrangerShuffle.tsx`.
+- The included photos are AI-generated (the people don't exist), CC0 / public domain, from [faker-js/assets-person-portrait](https://github.com/faker-js/assets-person-portrait).
 - `you.webp`: the small "You" window (optional).
 - Portrait 4:5, about 800×1000, under 200 KB each (webp or jpg).
 

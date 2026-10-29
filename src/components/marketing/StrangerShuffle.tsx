@@ -4,15 +4,15 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { countryFlag, countryName } from "@/lib/countries";
 
-// Illustrative only. Photo N in /public/hero (sorted by name) pairs with entry N here,
-// so match each photo to its country/line (e.g. 1-brazil.webp, 2-japan.webp…).
+// Illustrative only. Photo N in /public/hero (sorted by name) pairs with entry N here.
+// Photos: AI-generated people (not real), CC0 — github.com/faker-js/assets-person-portrait
 const REEL = [
-  { name: "Ana", country: "BR", line: "Hi from São Paulo!" },
-  { name: "Kenji", country: "JP", line: "What time is it there?" },
-  { name: "Maya", country: "IN", line: "Ok your cat is adorable" },
-  { name: "Luca", country: "IT", line: "Ciao! Practising my English" },
-  { name: "Ioana", country: "RO", line: "Salut! Where are you from?" },
-  { name: "Sam", country: "US", line: "Next or stay? Stay." },
+  { country: "CA", line: "Hi! Greetings from Toronto" },
+  { country: "BR", line: "Oi! Hi from São Paulo!" },
+  { country: "JP", line: "What time is it there?" },
+  { country: "LK", line: "Practising my English, be patient!" },
+  { country: "IE", line: "Hiya! Where are you from?" },
+  { country: "NL", line: "Next or stay? Stay." },
 ];
 
 /**
