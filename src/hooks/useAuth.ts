@@ -12,12 +12,28 @@ export interface Profile {
   age_confirmed_at: string | null;
 }
 
-export type AuthStatus = "loading" | "signed-out" | "signed-in" | "unconfigured";
+export type AuthStatus = "loading" | "signed-out" | "signed-in" | "unconfigured" | "db-error";
+
+const PROFILE_COLUMNS = "id, display_name, role, banned, age_confirmed_at";
+
+/** Load my profile; if it's missing, ask the database to create it, then retry once. */
+async function fetchProfile(supabase: ReturnType<typeof getSupabase>, userId: string): Promise<{ profile: Profile | null; error: string | null }> {
+  const read = () => supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", userId).maybeSingle();
+  let { data, error } = await read();
+  if (!error && !data) {
+    const { error: rpcError } = await supabase.rpc("ensure_profile");
+    if (rpcError) return { profile: null, error: rpcError.message };
+    ({ data, error } = await read());
+  }
+  if (error) return { profile: null, error: error.message };
+  return { profile: (data as Profile) ?? null, error: data ? null : "Profile could not be created." };
+}
 
 export function useAuth() {
   const [status, setStatus] = useState<AuthStatus>(() => (isSupabaseConfigured() ? "loading" : "unconfigured"));
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
   /** While the guest flow runs, it owns state updates (avoids an age-gate flash). */
   const guestFlow = useRef(false);
 
@@ -32,13 +48,10 @@ export function useAuth() {
         setStatus("signed-out");
         return;
       }
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, display_name, role, banned, age_confirmed_at")
-        .eq("id", s.user.id)
-        .single();
-      setProfile((data as Profile) ?? null);
-      setStatus("signed-in");
+      const { profile: p, error } = await fetchProfile(supabase, s.user.id);
+      setProfile(p);
+      setDbError(error);
+      setStatus(error ? "db-error" : "signed-in");
     };
 
     void supabase.auth.getSession().then(({ data }) => load(data.session));
@@ -81,14 +94,17 @@ export function useAuth() {
           ? "Couldn't reach the server. Check your connection and try again."
           : (error?.message ?? "Couldn't start a session. Try again.");
     }
+    const first = await fetchProfile(supabase, data.session.user.id);
+    if (first.error) {
+      setSession(data.session);
+      setDbError(first.error);
+      setStatus("db-error");
+      return null;
+    }
     await supabase.rpc("confirm_age");
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("id, display_name, role, banned, age_confirmed_at")
-      .eq("id", data.session.user.id)
-      .single();
+    const { profile: prof } = await fetchProfile(supabase, data.session.user.id);
     setSession(data.session);
-    setProfile((prof as Profile) ?? null);
+    setProfile(prof);
     setStatus("signed-in");
     return null;
   };
@@ -108,5 +124,11 @@ export function useAuth() {
     setProfile((p) => (p ? { ...p, age_confirmed_at: new Date().toISOString() } : p));
   };
 
-  return { status, session, profile, signInWithGoogle, signInAsGuest, signInWithPassword, signOut, confirmAge };
+  /** Throw away the current session and start fresh (used by the error screen). */
+  const reset = async () => {
+    await getSupabase().auth.signOut();
+    window.location.reload();
+  };
+
+  return { status, session, profile, dbError, reset, signInWithGoogle, signInAsGuest, signInWithPassword, signOut, confirmAge };
 }

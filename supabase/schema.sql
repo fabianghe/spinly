@@ -146,6 +146,31 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Self-heal: create my profile if it's missing (e.g. I signed in before this
+-- schema was installed, so the trigger above never ran for me).
+create or replace function public.ensure_profile()
+returns void
+language plpgsql security definer set search_path = public
+as $$
+declare
+  u auth.users;
+  full_name text;
+begin
+  select * into u from auth.users where id = auth.uid();
+  if not found then return; end if;
+  full_name := coalesce(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', '');
+  insert into public.profiles (id, email, display_name, avatar_url)
+  values (u.id, u.email, coalesce(nullif(split_part(full_name, ' ', 1), ''), 'Stranger'), u.raw_user_meta_data->>'avatar_url')
+  on conflict (id) do nothing;
+end;
+$$;
+
+-- Backfill anyone who signed up before the trigger existed.
+insert into public.profiles (id, email)
+select u.id, u.email from auth.users u
+where not exists (select 1 from public.profiles p where p.id = u.id)
+on conflict (id) do nothing;
+
 -- Partner card shown to the other person: first name + country, nothing else.
 create or replace function public._partner_json(p_match public.matches, p_me uuid)
 returns json
@@ -469,6 +494,12 @@ grant execute on function public.find_match(text), public.queue_poll(), public.l
   to authenticated;
 
 grant execute on function public.online_count() to anon, authenticated;
+grant execute on function public.ensure_profile() to authenticated;
+
+-- Newer Supabase projects may not auto-grant API access to new tables.
+-- Grant read access explicitly; Row Level Security still decides which rows.
+grant usage on schema public to anon, authenticated;
+grant select on public.profiles, public.matches, public.reports, public.waiting_queue, public.banned_ips to authenticated;
 
 -- ---------- Realtime --------------------------------------------------
 -- Instant "you've been matched" / "partner left" events (RLS still applies).

@@ -8,10 +8,11 @@ import { ChatRoom } from "./ChatRoom";
 
 /** Gatekeeper: sign-in → 18+ confirmation → chat room. */
 export function ChatApp() {
-  const { status, session, profile, signInWithGoogle, signInAsGuest, confirmAge } = useAuth();
+  const { status, session, profile, dbError, reset, signInWithGoogle, signInAsGuest, confirmAge } = useAuth();
 
   if (status === "unconfigured") return <Centered title="Almost there">Add your Supabase keys to the environment variables (see README) and redeploy.</Centered>;
   if (status === "loading") return <Centered title="Loading…" />;
+  if (status === "db-error") return <DbError message={dbError} onReset={reset} />;
   if (status === "signed-out" || !session)
     return guestsAllowed ? (
       <GuestStart onStart={signInAsGuest} onGoogle={googleEnabled ? () => signInWithGoogle("/chat") : undefined} />
@@ -84,6 +85,31 @@ function GuestStart({ onStart, onGoogle }: { onStart: () => Promise<string | nul
             Or continue with Google
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Shown when the database isn't set up correctly, with the actual error for the site owner. */
+function DbError({ message, onReset }: { message: string | null; onReset: () => void }) {
+  return (
+    <div className="grid min-h-dvh place-items-center p-6 text-center">
+      <div className="max-w-md">
+        <h1 className="font-display text-3xl font-bold">We couldn&apos;t load your session</h1>
+        <p className="mt-3 text-haze">Please try again in a moment.</p>
+        <button onClick={onReset} className="mt-6 rounded-full bg-coral px-6 py-3 font-semibold text-plum-deep hover:bg-coral-hot">
+          Start over
+        </button>
+        <details className="mt-8 text-left text-sm text-haze">
+          <summary className="cursor-pointer">Details for the site owner</summary>
+          <p className="mt-2">
+            Database error: <code className="text-mist">{message ?? "unknown"}</code>
+          </p>
+          <p className="mt-2">
+            Usually this means <code>supabase/schema.sql</code> hasn&apos;t been run (or only partly) in this Supabase
+            project. Run the whole file in the SQL Editor, then press Start over.
+          </p>
+        </details>
       </div>
     </div>
   );
